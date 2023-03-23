@@ -1,7 +1,7 @@
 
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
-
+import { AppStorage, LibAppStorage } from  "../libraries/LibAppStorage.sol";
 import {MarketAPI} from "@zondax/filecoin-solidity/contracts/v0.8/MarketAPI.sol";
 import {CommonTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/CommonTypes.sol";
 import {MarketTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/MarketTypes.sol";
@@ -10,12 +10,12 @@ import {CommonTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/Common
 import {AccountCBOR} from "@zondax/filecoin-solidity/contracts/v0.8/cbor/AccountCbor.sol";
 import {MarketCBOR} from "@zondax/filecoin-solidity/contracts/v0.8/cbor/MarketCbor.sol";
 import {BytesCBOR} from "@zondax/filecoin-solidity/contracts/v0.8/cbor/BytesCbor.sol";
-import {BigNumbers} from "@zondax/filecoin-solidity/contracts/v0.8/external/BigNumbers.sol";
-import {CBOR} from "@zondax/filecoin-solidity/contracts/v0.8/external/CBOR.sol";
+import {BigNumbers, BigNumber} from "@zondax/solidity-bignumber/src/BigNumbers.sol";
+import {CBOR} from "solidity-cborutils/contracts/CBOR.sol";
 import {Misc} from "@zondax/filecoin-solidity/contracts/v0.8/utils/Misc.sol";
 import {FilAddresses} from "@zondax/filecoin-solidity/contracts/v0.8/utils/FilAddresses.sol";
-import {MarketDealNotifyParams, deserializeMarketDealNotifyParams, serializeDealProposal, deserializeDealProposal} from "../libraries/Types.sol";
-import {RequestId, RequestIdx, ProviderSet, DealRequest, ExtraParamsV1} from '../libraries/LibAppStorage.sol';
+import {Types} from "../libraries/Types.sol";
+import {MarketDealNotifyParams, Status, RequestId, RequestIdx, ProviderSet, DealRequest, ExtraParamsV1} from '../libraries/LibAppStorage.sol';
 
 using CBOR for CBOR.CBORBuffer;
 
@@ -33,7 +33,7 @@ function serializeExtraParamsV1(
 }
 
 contract DealClientFacet {
-		AppStorage storage s = LibAppStorage.diamondStorage();
+		AppStorage internal s = LibAppStorage.diamondStorage();
     using AccountCBOR for *;
     using MarketCBOR for *;
 
@@ -47,47 +47,47 @@ contract DealClientFacet {
 
     function getProviderSet(
         bytes calldata cid
-    ) public view returns (ProviderSet memory) {
-        return pieceProviders[cid];
+    ) external view returns (ProviderSet memory) {
+        return s.pieceProviders[cid];
     }
 
     function getProposalIdSet(
         bytes calldata cid
-    ) public view returns (RequestId memory) {
-        return pieceRequests[cid];
+    ) external view returns (RequestId memory) {
+        return s.pieceRequests[cid];
     }
 
-    function dealsLength() public view returns (uint256) {
-        return dealRequests.length;
+    function dealsLength() external view returns (uint256) {
+        return s.dealRequests.length;
     }
 
     function getDealByIndex(
         uint256 index
-    ) public view returns (DealRequest memory) {
-        return dealRequests[index];
+    ) external view returns (DealRequest memory) {
+        return s.dealRequests[index];
     }
 
     function makeDealProposal(
         DealRequest calldata deal
-    ) public returns (bytes32) {
-        require(msg.sender == owner);
+    ) external returns (bytes32) {
+        require(msg.sender == s.owner);
 
-        if (pieceStatus[deal.piece_cid] == Status.DealPublished ||
-            pieceStatus[deal.piece_cid] == Status.DealActivated) {
+        if (s.pieceStatus[deal.piece_cid] == Status.DealPublished ||
+            s.pieceStatus[deal.piece_cid] == Status.DealActivated) {
             revert("deal with this pieceCid already published");
         }
 
-        uint256 index = dealRequests.length;
-        dealRequests.push(deal);
+        uint256 index = s.dealRequests.length;
+        s.dealRequests.push(deal);
 
         // creates a unique ID for the deal proposal -- there are many ways to do this
         bytes32 id = keccak256(
             abi.encodePacked(block.timestamp, msg.sender, index)
         );
-        dealRequestIdx[id] = RequestIdx(index, true);
+        s.dealRequestIdx[id] = RequestIdx(index, true);
 
-        pieceRequests[deal.piece_cid] = RequestId(id, true);
-        pieceStatus[deal.piece_cid] = Status.RequestSubmitted;
+        s.pieceRequests[deal.piece_cid] = RequestId(id, true);
+        s.pieceStatus[deal.piece_cid] = Status.RequestSubmitted;
 
         // writes the proposal metadata to the event log
         emit DealProposalCreate(
@@ -104,15 +104,15 @@ contract DealClientFacet {
     function getDealRequest(
         bytes32 requestId
     ) internal view returns (DealRequest memory) {
-        RequestIdx memory ri = dealRequestIdx[requestId];
+        RequestIdx memory ri = s.dealRequestIdx[requestId];
         require(ri.valid, "proposalId not available");
-        return dealRequests[ri.idx];
+        return s.dealRequests[ri.idx];
     }
 
     // Returns a CBOR-encoded DealProposal.
     function getDealProposal(
         bytes32 proposalId
-    ) public view returns (bytes memory) {
+    ) external view returns (bytes memory) {
         DealRequest memory deal = getDealRequest(proposalId);
 
         MarketTypes.DealProposal memory ret;
@@ -131,7 +131,7 @@ contract DealClientFacet {
         ret.provider_collateral = uintToBigInt(deal.provider_collateral);
         ret.client_collateral = uintToBigInt(deal.client_collateral);
 
-        return serializeDealProposal(ret);
+        return Types.serializeDealProposal(ret);
     }
 
     // TODO fix in filecoin-solidity. They're using the wrong hex value.
@@ -143,7 +143,7 @@ contract DealClientFacet {
 
     function getExtraParams(
         bytes32 proposalId
-    ) public view returns (bytes memory extra_params) {
+    ) external view returns (bytes memory extra_params) {
         DealRequest memory deal = getDealRequest(proposalId);
         return serializeExtraParamsV1(deal.extra_params);
     }
@@ -156,21 +156,21 @@ contract DealClientFacet {
     // @params - cbor byte array of AccountTypes.AuthenticateMessageParams
     function authenticateMessage(bytes memory params) internal view {
         require(
-            msg.sender == MARKET_ACTOR_ETH_ADDRESS,
+            msg.sender == s.MARKET_ACTOR_ETH_ADDRESS,
             "msg.sender needs to be market actor f05"
         );
 
         AccountTypes.AuthenticateMessageParams memory amp = params
             .deserializeAuthenticateMessageParams();
-        MarketTypes.DealProposal memory proposal = deserializeDealProposal(
+        MarketTypes.DealProposal memory proposal = Types.deserializeDealProposal(
             amp.message
         );
 
         bytes memory pieceCid = proposal.piece_cid.data;
-        require(pieceRequests[pieceCid].valid, "piece cid must be added before authorizing");
-        require(!pieceProviders[pieceCid].valid, "deal failed policy check: provider already claimed this cid");
+        require(s.pieceRequests[pieceCid].valid, "piece cid must be added before authorizing");
+        require(!s.pieceProviders[pieceCid].valid, "deal failed policy check: provider already claimed this cid");
 
-        DealRequest memory req = getDealRequest(pieceRequests[pieceCid].requestId);
+        DealRequest memory req = getDealRequest(s.pieceRequests[pieceCid].requestId);
         require(proposal.verified_deal == req.verified_deal, "verified_deal param mismatch");
         require(bigIntToUint(proposal.storage_price_per_epoch) <= req.storage_price_per_epoch, "storage price greater than request amount");
         require(bigIntToUint(proposal.client_collateral) <= req.client_collateral, "client collateral greater than request amount");
@@ -184,14 +184,14 @@ contract DealClientFacet {
     // @params - cbor byte array of MarketDealNotifyParams
     function dealNotify(bytes memory params) internal {
         require(
-            msg.sender == MARKET_ACTOR_ETH_ADDRESS,
+            msg.sender == s.MARKET_ACTOR_ETH_ADDRESS,
             "msg.sender needs to be market actor f05"
         );
 
-        MarketDealNotifyParams memory mdnp = deserializeMarketDealNotifyParams(
+        MarketDealNotifyParams memory mdnp = Types.deserializeMarketDealNotifyParams(
             params
         );
-        MarketTypes.DealProposal memory proposal = deserializeDealProposal(
+        MarketTypes.DealProposal memory proposal = Types.deserializeDealProposal(
             mdnp.dealProposal
         );
 
@@ -200,20 +200,20 @@ contract DealClientFacet {
         // within the same PSD msg, which would then get validated by authenticateMessage
         // However, only one of those deals should be allowed
         require(
-            pieceRequests[proposal.piece_cid.data].valid,
+            s.pieceRequests[proposal.piece_cid.data].valid,
             "piece cid must be added before authorizing"
         );
         require(
-            !pieceProviders[proposal.piece_cid.data].valid,
+            !s.pieceProviders[proposal.piece_cid.data].valid,
             "deal failed policy check: provider already claimed this cid"
         );
 
-        pieceProviders[proposal.piece_cid.data] = ProviderSet(
+        s.pieceProviders[proposal.piece_cid.data] = ProviderSet(
             proposal.provider.data,
             true
         );
-        pieceDeals[proposal.piece_cid.data] = mdnp.dealId;
-        pieceStatus[proposal.piece_cid.data] = Status.DealPublished;
+        s.pieceDeals[proposal.piece_cid.data] = mdnp.dealId;
+        s.pieceStatus[proposal.piece_cid.data] = Status.DealPublished;
     }
 
 
@@ -221,22 +221,22 @@ contract DealClientFacet {
     // associated with provided pieceCid and update the contract state based on that
     // info
     // @pieceCid - byte representation of pieceCid
-    function updateActivationStatus(bytes memory pieceCid) public {
-        require(pieceDeals[pieceCid] > 0, "no deal published for this piece cid");
+    function updateActivationStatus(bytes memory pieceCid) external {
+        require(s.pieceDeals[pieceCid] > 0, "no deal published for this piece cid");
 
-        MarketTypes.GetDealActivationReturn memory ret = MarketAPI.getDealActivation(pieceDeals[pieceCid]);
+        MarketTypes.GetDealActivationReturn memory ret = MarketAPI.getDealActivation(s.pieceDeals[pieceCid]);
         if (ret.terminated > 0) {
-            pieceStatus[pieceCid] = Status.DealTerminated;
+            s.pieceStatus[pieceCid] = Status.DealTerminated;
         } else if (ret.activated > 0) {
-            pieceStatus[pieceCid] = Status.DealActivated;
+            s.pieceStatus[pieceCid] = Status.DealActivated;
         }
     }
 
     // addBalance funds the builtin storage market actor's escrow
     // with funds from the contract's own balance
     // @value - amount to be added in escrow in attoFIL
-    function addBalance(uint256 value) public {
-        require(msg.sender == owner);
+    function addBalance(uint256 value) external {
+        require(msg.sender == s.owner);
         MarketAPI.addBalance(getDelegatedAddress(address(this)), value);
     }
 
@@ -244,7 +244,7 @@ contract DealClientFacet {
     function uintToBigInt(
         uint256 value
     ) internal view returns (CommonTypes.BigInt memory) {
-        BigNumbers.BigNumber memory bigNumVal = BigNumbers.init(value, false);
+        BigNumber memory bigNumVal = BigNumbers.init(value, false);
         CommonTypes.BigInt memory bigIntVal = CommonTypes.BigInt(
             bigNumVal.val,
             bigNumVal.neg
@@ -255,7 +255,7 @@ contract DealClientFacet {
     function bigIntToUint(
         CommonTypes.BigInt memory bigInt
     ) internal view returns (uint256) {
-        BigNumbers.BigNumber memory bigNumUint = BigNumbers.init(
+        BigNumber memory bigNumUint = BigNumbers.init(
             bigInt.val,
             bigInt.neg
         );
@@ -270,8 +270,8 @@ contract DealClientFacet {
     function withdrawBalance(
         address client,
         uint256 value
-    ) public returns (uint) {
-        require(msg.sender == owner);
+    ) external returns (uint) {
+        require(msg.sender == s.owner);
 
         MarketTypes.WithdrawBalanceParams memory params = MarketTypes
             .WithdrawBalanceParams(
@@ -285,7 +285,7 @@ contract DealClientFacet {
 
     function receiveDataCap(bytes memory params) internal {
         require(
-            msg.sender == DATACAP_ACTOR_ETH_ADDRESS,
+            msg.sender == s.DATACAP_ACTOR_ETH_ADDRESS,
             "msg.sender needs to be datacap actor f07"
         );
         emit ReceivedDataCap("DataCap Received!");
@@ -301,20 +301,20 @@ contract DealClientFacet {
         uint64 method,
         uint64,
         bytes memory params
-    ) public returns (uint32, uint64, bytes memory) {
+    ) external returns (uint32, uint64, bytes memory) {
         bytes memory ret;
         uint64 codec;
         // dispatch methods
-        if (method == AUTHENTICATE_MESSAGE_METHOD_NUM) {
+        if (method == s.AUTHENTICATE_MESSAGE_METHOD_NUM) {
             authenticateMessage(params);
             // If we haven't reverted, we should return a CBOR true to indicate that verification passed.
             CBOR.CBORBuffer memory buf = CBOR.create(1);
             buf.writeBool(true);
             ret = buf.data();
             codec = Misc.CBOR_CODEC;
-        } else if (method == MARKET_NOTIFY_DEAL_METHOD_NUM) {
+        } else if (method == s.MARKET_NOTIFY_DEAL_METHOD_NUM) {
             dealNotify(params);
-        } else if (method == DATACAP_RECEIVER_HOOK_METHOD_NUM) {
+        } else if (method == s.DATACAP_RECEIVER_HOOK_METHOD_NUM) {
             receiveDataCap(params);
         } else {
             revert("the filecoin method that was called is not handled");

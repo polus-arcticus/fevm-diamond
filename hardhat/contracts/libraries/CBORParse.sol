@@ -27,7 +27,7 @@ library CBORParse {
   uint8 constant MajTag = 6;
   uint8 constant MajOther = 7;
 
-  function specific_authenticate_message_params_parse(bytes calldata cbor_params ) pure returns (bytes calldata slice) {
+  function specific_authenticate_message_params_parse(bytes calldata cbor_params ) public pure returns (bytes calldata slice) {
     uint byteIdx = 0;
     // Expect a struct with two fields
     assert(cbor_params[0] == hex"82"); 
@@ -47,7 +47,7 @@ library CBORParse {
 
   }
 
-  function specific_deal_proposal_cbor_parse(bytes calldata cbor_deal_proposal) pure returns (bytes calldata rawcid, bytes calldata provider, uint size){
+  function specific_deal_proposal_cbor_parse(bytes calldata cbor_deal_proposal) public pure returns (bytes calldata rawcid, bytes calldata provider, uint size){
     // Shortcut: expect a struct with 11 fields and for the first field to start with a cid tag
     // 11 field struct
     uint byteIdx = 0;
@@ -89,7 +89,7 @@ library CBORParse {
     provider = cbor_deal_proposal[byteIdx:byteIdx+len];
   }
 
-  function slice_uint8(bytes memory bs, uint start) pure returns (uint8) {
+  function slice_uint8(bytes memory bs, uint start) public pure returns (uint8) {
 
     require(bs.length >= start + 1, "slicing out of range");
     uint8 x;
@@ -99,7 +99,7 @@ library CBORParse {
     return x;
   }
 
-  function slice_uint16(bytes memory bs, uint start) pure returns (uint16) {
+  function slice_uint16(bytes memory bs, uint start) public pure returns (uint16) {
     require(bs.length >= start + 2, "slicing out of range");
     uint16 x;
     assembly {
@@ -108,7 +108,7 @@ library CBORParse {
     return x;
   }
 
-  function slice_uint32(bytes memory bs, uint start) pure returns (uint32) {
+  function slice_uint32(bytes memory bs, uint start) public pure returns (uint32) {
     require(bs.length >= start + 4, "slicing out of range");
     uint32 x;
     assembly {
@@ -117,7 +117,7 @@ library CBORParse {
     return x;
   }
 
-  function slice_uint64(bytes memory bs, uint start) pure returns (uint64) {
+  function slice_uint64(bytes memory bs, uint start) public pure returns (uint64) {
     require(bs.length >= start + 8, "slicing out of range");
     uint64 x;
     assembly {
@@ -128,7 +128,7 @@ library CBORParse {
 
   // Parse cbor header for major type and extra info. 
   // Also return the byte index after moving past header bytes, and the number of bytes consumed
-  function parse_cbor_header(bytes memory cbor, uint byteIndex) pure returns (uint8, uint64, uint) {
+  function parse_cbor_header(bytes memory cbor, uint byteIndex) public pure returns (uint8, uint64, uint) {
     uint8 first = slice_uint8(cbor, byteIndex);
     byteIndex += 1;
     uint8 maj = (first & 0xe0) >> 5;

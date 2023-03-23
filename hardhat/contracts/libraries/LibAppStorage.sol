@@ -1,6 +1,7 @@
 pragma solidity 0.8.17;
 import {CommonTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/CommonTypes.sol";
 import {MarketTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/MarketTypes.sol";
+import { LibDiamond } from  "./LibDiamond.sol";
 
 enum Status {
   None,
@@ -50,16 +51,20 @@ struct ExtraParamsV1 {
   bool remove_unsealed_copy;
 }
 
-struct AppStorage {
-  uint64  constant AUTHENTICATE_MESSAGE_METHOD_NUM = 2643134072;
-  uint64  constant DATACAP_RECEIVER_HOOK_METHOD_NUM = 3726118371;
-  uint64  constant MARKET_NOTIFY_DEAL_METHOD_NUM = 4186741094;
-  address  constant MARKET_ACTOR_ETH_ADDRESS = address(0xff00000000000000000000000000000000000005);
-  address  constant DATACAP_ACTOR_ETH_ADDRESS = address(0xfF00000000000000000000000000000000000007);
+struct MarketDealNotifyParams {
+  bytes dealProposal;
+  uint64 dealId;
+}
 
-  address constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
-  uint64 constant DEFAULT_FLAG = 0x00000000;
-  uint64 constant METHOD_SEND = 0;
+struct AppStorage {
+  uint64  AUTHENTICATE_MESSAGE_METHOD_NUM;
+  uint64  DATACAP_RECEIVER_HOOK_METHOD_NUM;
+  uint64  MARKET_NOTIFY_DEAL_METHOD_NUM;
+  address  MARKET_ACTOR_ETH_ADDRESS; 
+  address  DATACAP_ACTOR_ETH_ADDRESS; 
+  address  CALL_ACTOR_ID;
+  uint64  DEFAULT_FLAG; 
+  uint64  METHOD_SEND;
 
   mapping(bytes32 => RequestIdx) dealRequestIdx; // contract deal id -> deal index
   DealRequest[] dealRequests;

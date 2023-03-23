@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
-
+import { AppStorage, LibAppStorage } from './LibAppStorage.sol';
 import { MarketTypes } from "@zondax/filecoin-solidity/contracts/v0.8/types/MarketTypes.sol";
-import { CBOR } from "@zondax/filecoin-solidity/contracts/v0.8/external/CBOR.sol";
+import {CBOR} from "solidity-cborutils/contracts/CBOR.sol";
 import { FilecoinCBOR } from "@zondax/filecoin-solidity/contracts/v0.8/cbor/FilecoinCbor.sol";
 import { CBORDecoder } from "@zondax/filecoin-solidity/contracts/v0.8/utils/CborDecode.sol";
 import { CommonTypes } from "@zondax/filecoin-solidity/contracts/v0.8/types/CommonTypes.sol";
 import { BigIntCBOR } from "@zondax/filecoin-solidity/contracts/v0.8/cbor/BigIntCbor.sol";
+import { MarketDealNotifyParams } from './LibAppStorage.sol';
 
 using CBOR for CBOR.CBORBuffer;
 using CBORDecoder for bytes;
@@ -15,12 +16,7 @@ using BigIntCBOR for bytes;
 using FilecoinCBOR for CBOR.CBORBuffer;
 
 library Types {
-  struct MarketDealNotifyParams {
-    bytes dealProposal;
-    uint64 dealId;
-  }
-
-  function deserializeMarketDealNotifyParams(bytes memory rawResp) pure returns (MarketDealNotifyParams memory ret) {
+  function deserializeMarketDealNotifyParams(bytes memory rawResp) external pure returns (MarketDealNotifyParams memory ret) {
     uint byteIdx = 0;
     uint len;
 
@@ -31,7 +27,7 @@ library Types {
     (ret.dealId, byteIdx) = rawResp.readUInt64(byteIdx);
   }
 
-  function serializeDealProposal(MarketTypes.DealProposal memory dealProposal) pure returns (bytes memory) {
+  function serializeDealProposal(MarketTypes.DealProposal memory dealProposal) external pure returns (bytes memory) {
     // FIXME what should the max length be on the buffer?
     CBOR.CBORBuffer memory buf = CBOR.create(64);
 
@@ -55,7 +51,7 @@ library Types {
     return buf.data();
   }
 
-  function deserializeDealProposal(bytes memory rawResp) pure returns (MarketTypes.DealProposal memory ret) {
+  function deserializeDealProposal(bytes memory rawResp) external pure returns (MarketTypes.DealProposal memory ret) {
     uint byteIdx = 0;
     uint len;
 
