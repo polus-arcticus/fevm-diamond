@@ -17,7 +17,7 @@ import {Types} from "../libraries/Types.sol";
 import {MarketDealNotifyParams, Status, RequestId, RequestIdx, ProviderSet, DealRequest, ExtraParamsV1} from '../libraries/LibAppStorage.sol';
 
 import { DealClientUtilsFacet } from './DealClientUtilsFacet.sol';
-
+import 'hardhat/console.sol';
 contract DealClientFacet {
   using CBOR for CBOR.CBORBuffer;
   using AccountCBOR for *;
@@ -95,6 +95,7 @@ contract DealClientFacet {
   function getDealProposal(
     bytes32 proposalId
   ) external view returns (bytes memory) {
+    console.log('hi');
     AppStorage storage s = LibAppStorage.diamondStorage();
     DealRequest memory deal = DealClientUtilsFacet(address(this)).getDealRequest(proposalId);
 

@@ -1,4 +1,5 @@
-
+require('@nomicfoundation/hardhat-toolbox')
+require('./tasks')
 /* global ethers task */
 require('@nomiclabs/hardhat-waffle')
 

@@ -34,6 +34,7 @@ async function deployDiamond () {
     'DiamondLoupeFacet',
     'OwnershipFacet',
     'DealClientFacet',
+    'DealClientUtilsFacet',
     'DealRewarderFacet',
     'FilecoinMarketConsumerFacet'
   ]
