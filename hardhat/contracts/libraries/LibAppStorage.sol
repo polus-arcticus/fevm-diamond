@@ -79,7 +79,7 @@ struct AppStorage {
   mapping(bytes => uint)  cidSizes;
   mapping(bytes => mapping(uint64 => bool))  cidProviders;
 
-  string  dealLabel;
+  CommonTypes.DealLabel  dealLabel;
   uint64  dealClientActorId;
   uint64  dealProviderActorId;
   bool  isDealActivated;

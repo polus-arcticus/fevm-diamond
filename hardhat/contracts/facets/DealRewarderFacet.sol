@@ -19,22 +19,24 @@ import { Misc } from "@zondax/filecoin-solidity/contracts/v0.8/utils/Misc.sol";
 
  */
 contract DealRewarderFacet {
-  AppStorage internal s = LibAppStorage.diamondStorage();
 
   function fund(uint64 unused) public payable {}
 
   function addCID(bytes calldata cidraw, uint size) public {
+    AppStorage storage s = LibAppStorage.diamondStorage();
     require(msg.sender == s.owner);
     s.cidSet[cidraw] = true;
     s.cidSizes[cidraw] = size;
   }
 
   function policyOK(bytes memory cidraw, uint64 provider) internal view returns (bool) {
+    AppStorage storage s = LibAppStorage.diamondStorage();
     bool alreadyStoring = s.cidProviders[cidraw][provider];
     return !alreadyStoring;
   }
 
   function authorizeData(bytes memory cidraw, uint64 provider, uint size) public {
+    AppStorage storage s = LibAppStorage.diamondStorage();
     require(s.cidSet[cidraw], "cid must be added before authorizing");
     require(s.cidSizes[cidraw] == size, "data size must match expected");
     require(policyOK(cidraw, provider), "deal failed policy check: has provider already claimed this cid?");
@@ -43,6 +45,7 @@ contract DealRewarderFacet {
   }
   type FilActorId is uint64;
   function claim_bounty(uint64 deal_id) public {
+    AppStorage storage s = LibAppStorage.diamondStorage();
     MarketTypes.GetDealDataCommitmentReturn memory commitmentRet = MarketAPI.getDealDataCommitment(deal_id);
     uint64 providerRet = MarketAPI.getDealProvider(deal_id);
 
@@ -60,6 +63,7 @@ contract DealRewarderFacet {
   }
 
   function call_actor_id(uint64 method, uint256 value, uint64 flags, uint64 codec, bytes memory params, uint64 id) public returns (bool, int256, uint64, bytes memory) {
+    AppStorage storage s = LibAppStorage.diamondStorage();
     (bool success, bytes memory data) = address(s.CALL_ACTOR_ID).delegatecall(abi.encode(method, value, flags, codec, params, id));
     (int256 exit, uint64 return_codec, bytes memory return_value) = abi.decode(data, (int256, uint64, bytes));
     return (success, exit, return_codec, return_value);
@@ -67,6 +71,7 @@ contract DealRewarderFacet {
 
   // send 1 FIL to the filecoin actor at actor_id
   function send(uint64 actorID) internal {
+    AppStorage storage s = LibAppStorage.diamondStorage();
     bytes memory emptyParams = "";
     delete emptyParams;
 

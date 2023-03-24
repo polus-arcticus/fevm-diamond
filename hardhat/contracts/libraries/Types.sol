@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
-import { AppStorage, LibAppStorage } from './LibAppStorage.sol';
 import { MarketTypes } from "@zondax/filecoin-solidity/contracts/v0.8/types/MarketTypes.sol";
 import {CBOR} from "solidity-cborutils/contracts/CBOR.sol";
 import { FilecoinCBOR } from "@zondax/filecoin-solidity/contracts/v0.8/cbor/FilecoinCbor.sol";
 import { CBORDecoder } from "@zondax/filecoin-solidity/contracts/v0.8/utils/CborDecode.sol";
 import { CommonTypes } from "@zondax/filecoin-solidity/contracts/v0.8/types/CommonTypes.sol";
 import { BigIntCBOR } from "@zondax/filecoin-solidity/contracts/v0.8/cbor/BigIntCbor.sol";
-import { MarketDealNotifyParams } from './LibAppStorage.sol';
+import { MarketDealNotifyParams, ExtraParamsV1 } from './LibAppStorage.sol';
+import {BigNumbers, BigNumber} from "@zondax/solidity-bignumber/src/BigNumbers.sol";
 
 using CBOR for CBOR.CBORBuffer;
 using CBORDecoder for bytes;
 using BigIntCBOR for CommonTypes.BigInt;
 using BigIntCBOR for bytes;
 using FilecoinCBOR for CBOR.CBORBuffer;
+using FilecoinCBOR for bytes;
 
 library Types {
-  function deserializeMarketDealNotifyParams(bytes memory rawResp) external pure returns (MarketDealNotifyParams memory ret) {
+  function deserializeMarketDealNotifyParams(bytes memory rawResp) internal pure returns (MarketDealNotifyParams memory ret) {
     uint byteIdx = 0;
     uint len;
 
@@ -27,7 +28,7 @@ library Types {
     (ret.dealId, byteIdx) = rawResp.readUInt64(byteIdx);
   }
 
-  function serializeDealProposal(MarketTypes.DealProposal memory dealProposal) external pure returns (bytes memory) {
+  function serializeDealProposal(MarketTypes.DealProposal memory dealProposal) internal pure returns (bytes memory) {
     // FIXME what should the max length be on the buffer?
     CBOR.CBORBuffer memory buf = CBOR.create(64);
 
@@ -41,9 +42,14 @@ library Types {
     buf.writeBool(dealProposal.verified_deal);
     buf.writeBytes(dealProposal.client.data);
     buf.writeBytes(dealProposal.provider.data);
-    buf.writeString(dealProposal.label);
-    buf.writeInt64(dealProposal.start_epoch);
-    buf.writeInt64(dealProposal.end_epoch);
+    //buf.writeString(dealProposal.label);
+    dealProposal.label.isString ? 
+      buf.writeString(string(dealProposal.label.data)) :
+      buf.writeBytes(dealProposal.label.data);
+    //buf.writeInt64(dealProposal.start_epoch);
+    buf.writeInt64(CommonTypes.ChainEpoch.unwrap(dealProposal.start_epoch));
+    //buf.writeInt64(dealProposal.end_epoch);
+    buf.writeInt64(CommonTypes.ChainEpoch.unwrap(dealProposal.end_epoch));
     buf.writeBytes(dealProposal.storage_price_per_epoch.serializeBigInt());
     buf.writeBytes(dealProposal.provider_collateral.serializeBigInt());
     buf.writeBytes(dealProposal.client_collateral.serializeBigInt());
@@ -51,7 +57,7 @@ library Types {
     return buf.data();
   }
 
-  function deserializeDealProposal(bytes memory rawResp) external pure returns (MarketTypes.DealProposal memory ret) {
+  function deserializeDealProposal(bytes memory rawResp) internal pure returns (MarketTypes.DealProposal memory ret) {
     uint byteIdx = 0;
     uint len;
 
@@ -74,9 +80,9 @@ library Types {
     (ret.client.data, byteIdx) = rawResp.readBytes(byteIdx);
     (ret.provider.data, byteIdx) = rawResp.readBytes(byteIdx);
 
-    (ret.label, byteIdx) = rawResp.readString(byteIdx);
-    (ret.start_epoch, byteIdx) = rawResp.readInt64(byteIdx);
-    (ret.end_epoch, byteIdx) = rawResp.readInt64(byteIdx);
+    (ret.label, byteIdx) = rawResp.readDealLabel(byteIdx);
+    (ret.start_epoch, byteIdx) = rawResp.readChainEpoch(byteIdx);
+    (ret.end_epoch, byteIdx) = rawResp.readChainEpoch(byteIdx);
 
     bytes memory storage_price_per_epoch_bytes;
     (storage_price_per_epoch_bytes, byteIdx) = rawResp.readBytes(byteIdx);
@@ -89,6 +95,41 @@ library Types {
     bytes memory client_collateral_bytes;
     (client_collateral_bytes, byteIdx) = rawResp.readBytes(byteIdx);
     ret.client_collateral = client_collateral_bytes.deserializeBigInt();
+  }
+
+  // TODO: Below 2 funcs need to go to filecoin.sol
+  function uintToBigInt(
+    uint256 value
+  ) internal view returns (CommonTypes.BigInt memory) {
+    BigNumber memory bigNumVal = BigNumbers.init(value, false);
+    CommonTypes.BigInt memory bigIntVal = CommonTypes.BigInt(
+      bigNumVal.val,
+      bigNumVal.neg
+    );
+    return bigIntVal;
+  }
+
+  function bigIntToUint(
+    CommonTypes.BigInt memory bigInt
+  ) internal view returns (uint256) {
+    BigNumber memory bigNumUint = BigNumbers.init(
+      bigInt.val,
+      bigInt.neg
+    );
+    uint256 bigNumExtractedUint = uint256(bytes32(bigNumUint.val));
+    return bigNumExtractedUint;
+  }
+
+  function serializeExtraParamsV1(
+    ExtraParamsV1 memory params
+  ) pure internal returns (bytes memory) {
+    CBOR.CBORBuffer memory buf = CBOR.create(64);
+    buf.startFixedArray(4);
+    buf.writeString(params.location_ref);
+    buf.writeUInt64(params.car_size);
+    buf.writeBool(params.skip_ipni_announce);
+    buf.writeBool(params.remove_unsealed_copy);
+    return buf.data();
   }
 
 }
