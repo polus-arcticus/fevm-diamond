@@ -2,21 +2,25 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 import { AppStorage, LibAppStorage } from  "../libraries/LibAppStorage.sol";
+import { DealClientUtilsFacet } from './DealClientUtilsFacet.sol';
+
 import {MarketAPI} from "@zondax/filecoin-solidity/contracts/v0.8/MarketAPI.sol";
-import {CommonTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/CommonTypes.sol";
+
 import {MarketTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/MarketTypes.sol";
 import {AccountTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/AccountTypes.sol";
 import {CommonTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/CommonTypes.sol";
+
 import {AccountCBOR} from "@zondax/filecoin-solidity/contracts/v0.8/cbor/AccountCbor.sol";
 import {MarketCBOR} from "@zondax/filecoin-solidity/contracts/v0.8/cbor/MarketCbor.sol";
 import {BytesCBOR} from "@zondax/filecoin-solidity/contracts/v0.8/cbor/BytesCbor.sol";
 import {CBOR} from "solidity-cborutils/contracts/CBOR.sol";
 import {Misc} from "@zondax/filecoin-solidity/contracts/v0.8/utils/Misc.sol";
 import {FilAddresses} from "@zondax/filecoin-solidity/contracts/v0.8/utils/FilAddresses.sol";
-import {Types} from "../libraries/Types.sol";
+import {BigNumbers, BigNumber} from "@zondax/solidity-bignumber/src/BigNumbers.sol";
+import {BigInts} from '@zondax/filecoin-solidity/contracts/v0.8/utils/BigInts.sol';
 import {MarketDealNotifyParams, Status, RequestId, RequestIdx, ProviderSet, DealRequest, ExtraParamsV1} from '../libraries/LibAppStorage.sol';
 
-import { DealClientUtilsFacet } from './DealClientUtilsFacet.sol';
+
 import 'hardhat/console.sol';
 contract DealClientFacet {
   using CBOR for CBOR.CBORBuffer;
@@ -95,15 +99,13 @@ contract DealClientFacet {
   function getDealProposal(
     bytes32 proposalId
   ) external view returns (bytes memory) {
-    console.log('hi');
-    AppStorage storage s = LibAppStorage.diamondStorage();
     DealRequest memory deal = DealClientUtilsFacet(address(this)).getDealRequest(proposalId);
 
     MarketTypes.DealProposal memory ret;
     ret.piece_cid = CommonTypes.Cid(deal.piece_cid);
     ret.piece_size = deal.piece_size;
     ret.verified_deal = deal.verified_deal;
-    ret.client = DealClientUtilsFacet(address(this)).getDelegatedAddress(address(this));
+    ret.client = FilAddresses.fromEthAddress(address(this));
     // Set a dummy provider. The provider that picks up this deal will need to set its own address.
     ret.provider = FilAddresses.fromActorID(0);
     
@@ -111,13 +113,13 @@ contract DealClientFacet {
     ret.start_epoch = CommonTypes.ChainEpoch.wrap(deal.start_epoch);
     ret.end_epoch = CommonTypes.ChainEpoch.wrap(deal.end_epoch);
    
-    ret.storage_price_per_epoch = Types.uintToBigInt(
+    ret.storage_price_per_epoch = BigInts.fromUint256(
       deal.storage_price_per_epoch
     );
-    ret.provider_collateral = Types.uintToBigInt(deal.provider_collateral);
-    ret.client_collateral = Types.uintToBigInt(deal.client_collateral);
+    ret.provider_collateral = BigInts.fromUint256(deal.provider_collateral);
+    ret.client_collateral = BigInts.fromUint256(deal.client_collateral);
 
-    return Types.serializeDealProposal(ret);
+    return MarketCBOR.serializeDealProposal(ret);
   }
 
 
@@ -146,7 +148,7 @@ contract DealClientFacet {
   function addBalance(uint256 value) external {
     AppStorage storage s = LibAppStorage.diamondStorage();
     require(msg.sender == s.owner);
-    MarketAPI.addBalance(DealClientUtilsFacet(address(this)).getDelegatedAddress(address(this)), value);
+    MarketAPI.addBalance(FilAddresses.fromEthAddress(address(this)), value);
   }
 
 
@@ -163,12 +165,14 @@ contract DealClientFacet {
 
     MarketTypes.WithdrawBalanceParams memory params = MarketTypes
     .WithdrawBalanceParams(
-      DealClientUtilsFacet(address(this)).getDelegatedAddress(client),
-      Types.uintToBigInt(value)
+      FilAddresses.fromEthAddress(client),
+      BigInts.fromUint256(value)
     );
     CommonTypes.BigInt memory ret = MarketAPI.withdrawBalance(params);
+    (uint256 withdrawBalanceAmount, bool withdrawBalanceConverted) = BigInts.toUint256(ret);
+    require(withdrawBalanceConverted, "Problems converting withdraw balance into Big Int, may cause an overflow");
 
-    return Types.bigIntToUint(ret);
+    return withdrawBalanceAmount;
   }
 
 

@@ -7,28 +7,33 @@ import {MarketCBOR} from "@zondax/filecoin-solidity/contracts/v0.8/cbor/MarketCb
 import {CommonTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/CommonTypes.sol";
 import {MarketTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/MarketTypes.sol";
 import {AccountTypes} from "@zondax/filecoin-solidity/contracts/v0.8/types/AccountTypes.sol";
-import {Types} from '../libraries/Types.sol';
 import {Misc} from "@zondax/filecoin-solidity/contracts/v0.8/utils/Misc.sol";
-import {MarketDealNotifyParams, Status, RequestId, RequestIdx, ProviderSet, DealRequest, ExtraParamsV1} from '../libraries/LibAppStorage.sol';
+import {Status, RequestId, RequestIdx, ProviderSet, DealRequest, ExtraParamsV1} from '../libraries/LibAppStorage.sol';
+import {BigInts} from '@zondax/filecoin-solidity/contracts/v0.8/utils/BigInts.sol';
 contract DealClientUtilsFacet {
   event ReceivedDataCap(string received);
 
   using CBOR for CBOR.CBORBuffer;
   using AccountCBOR for *;
   using MarketCBOR for *;
-  
-  // TODO fix in filecoin-solidity. They're using the wrong hex value.
-  function getDelegatedAddress(
-    address addr
-  ) public pure returns (CommonTypes.FilAddress memory) {
-    return CommonTypes.FilAddress(abi.encodePacked(hex"040a", addr));
-  }
 
+  // TODO fix in filecoin-solidity. They're using the wrong hex value.
+  function serializeExtraParamsV1(
+    ExtraParamsV1 memory params
+  ) pure public returns (bytes memory) {
+    CBOR.CBORBuffer memory buf = CBOR.create(64);
+    buf.startFixedArray(4);
+    buf.writeString(params.location_ref);
+    buf.writeUInt64(params.car_size);
+    buf.writeBool(params.skip_ipni_announce);
+    buf.writeBool(params.remove_unsealed_copy);
+    return buf.data();
+  }
   function getExtraParams(
     bytes32 proposalId
   ) external view returns (bytes memory extra_params) {
     DealRequest memory deal = getDealRequest(proposalId);
-    return Types.serializeExtraParamsV1(deal.extra_params);
+    return serializeExtraParamsV1(deal.extra_params);
   }
   // helper function to get deal request based from id
   function getDealRequest(
@@ -52,10 +57,10 @@ contract DealClientUtilsFacet {
       "msg.sender needs to be market actor f05"
     );
 
-    MarketDealNotifyParams memory mdnp = Types.deserializeMarketDealNotifyParams(
+    MarketTypes.MarketDealNotifyParams memory mdnp = MarketCBOR.deserializeMarketDealNotifyParams(
       params
     );
-    MarketTypes.DealProposal memory proposal = Types.deserializeDealProposal(
+    MarketTypes.DealProposal memory proposal = MarketCBOR.deserializeDealProposal(
       mdnp.dealProposal
     );
 
@@ -104,7 +109,7 @@ contract DealClientUtilsFacet {
 
     AccountTypes.AuthenticateMessageParams memory amp = params
     .deserializeAuthenticateMessageParams();
-    MarketTypes.DealProposal memory proposal = Types.deserializeDealProposal(
+    MarketTypes.DealProposal memory proposal = MarketCBOR.deserializeDealProposal(
       amp.message
     );
 
@@ -113,9 +118,14 @@ contract DealClientUtilsFacet {
     require(!s.pieceProviders[pieceCid].valid, "deal failed policy check: provider already claimed this cid");
 
     DealRequest memory req = DealClientUtilsFacet(address(this)).getDealRequest(s.pieceRequests[pieceCid].requestId);
+
     require(proposal.verified_deal == req.verified_deal, "verified_deal param mismatch");
-    require(Types.bigIntToUint(proposal.storage_price_per_epoch) <= req.storage_price_per_epoch, "storage price greater than request amount");
-    require(Types.bigIntToUint(proposal.client_collateral) <= req.client_collateral, "client collateral greater than request amount");
+
+    (uint256 proposalStoragePricePerEpoch, bool storagePriceConverted) = BigInts.toUint256(proposal.storage_price_per_epoch);
+    (uint256 proposalClientCollateral, bool collateralConverted) = BigInts.toUint256(proposal.storage_price_per_epoch);
+    require(storagePriceConverted && collateralConverted, "Issues converting uint256 to BigInt, may not have accurate values");
+    require(proposalStoragePricePerEpoch <= req.storage_price_per_epoch, "storage price greater than request amount");
+    require(proposalClientCollateral <= req.client_collateral, "client collateral greater than request amount");
 
   }
 
