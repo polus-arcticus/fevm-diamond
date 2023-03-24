@@ -7,6 +7,10 @@ async function deployDiamond () {
   const accounts = await ethers.getSigners()
   const contractOwner = accounts[0]
 
+  const SimpleCoin = await ethers.getContractFactory('SimpleCoin')
+  const simpleCoin = await SimpleCoin.deploy()
+  await simpleCoin.deployed()
+
   // deploy DiamondCutFacet
   const DiamondCutFacet = await ethers.getContractFactory('DiamondCutFacet')
   const diamondCutFacet = await DiamondCutFacet.deploy()
@@ -28,7 +32,6 @@ async function deployDiamond () {
   console.log('DiamondInit deployed:', diamondInit.address)
 
   // deploy facets
-  console.log('')
   console.log('Deploying facets')
   const FacetNames = [
     'DiamondLoupeFacet',
@@ -67,7 +70,11 @@ async function deployDiamond () {
     throw Error(`Diamond upgrade failed: ${tx.hash}`)
   }
   console.log('Completed diamond cut')
-  return diamond.address
+
+  return {
+    diamond: diamond.address,
+    simpleCoin: simpleCoin.address
+  }
 }
 
 // We recommend this pattern to be able to use async/await everywhere
