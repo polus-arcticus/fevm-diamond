@@ -40,9 +40,11 @@
     "@zondax/filecoin-solidity": "^4.0.2",
     "@zondax/solidity-bignumber": "^0.1.0",
     "blockstore-core": "^4.1.0",
+    "cids": "^1.1.9",
     "datastore-core": "^9.1.0",
     "helia": "next",
     "libp2p": "^0.43.2",
+    "multiformats": "^11.0.2",
     "solidity-cborutils": "^2.0.0"
   }
 }
