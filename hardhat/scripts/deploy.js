@@ -5,6 +5,10 @@ const { getSelectors, FacetCutAction } = require('./libraries/diamond.js')
 
 async function deployDiamond () {
   const accounts = await ethers.getSigners()
+  const CallActorPrecompile = await ethers.getContractFactory('CallActorPrecompile')
+  const callActorPrecompile = await CallActorPrecompile.deploy()
+  await callActorPrecompile.deployed()
+  console.log('callActorPrecompile', callActorPrecompile.address)
   const contractOwner = accounts[0]
 
   const SimpleCoin = await ethers.getContractFactory('SimpleCoin')
@@ -55,7 +59,6 @@ async function deployDiamond () {
   }
 
   // upgrade diamond with facets
-  console.log('')
   console.log('Diamond Cut:', cut)
   
   const diamondCut = await ethers.getContractAt('IDiamondCut', diamond.address)

@@ -7,7 +7,7 @@ import { CommonTypes } from "@zondax/filecoin-solidity/contracts/v0.8/types/Comm
 import { MarketTypes } from "@zondax/filecoin-solidity/contracts/v0.8/types/MarketTypes.sol";
 import { Actor } from "@zondax/filecoin-solidity/contracts/v0.8/utils/Actor.sol";
 import { Misc } from "@zondax/filecoin-solidity/contracts/v0.8/utils/Misc.sol";
-
+import 'hardhat/console.sol';
 /* 
    Contract Usage
    Step   |   Who   |    What is happening  |   Why 
@@ -44,11 +44,16 @@ contract DealRewarderFacet {
     s.cidProviders[cidraw][provider] = true;
   }
   type FilActorId is uint64;
+
   function claim_bounty(uint64 deal_id) public {
+    console.log('hi');
     AppStorage storage s = LibAppStorage.diamondStorage();
+    console.log('hi2');
     MarketTypes.GetDealDataCommitmentReturn memory commitmentRet = MarketAPI.getDealDataCommitment(deal_id);
+    console.log('hi3');
     uint64 providerRet = MarketAPI.getDealProvider(deal_id);
 
+    console.log('hi4');
     authorizeData(commitmentRet.data, providerRet, commitmentRet.size);
 
     // get dealer (bounty hunter client)

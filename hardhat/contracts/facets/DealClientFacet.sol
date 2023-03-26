@@ -103,6 +103,9 @@ contract DealClientFacet {
 
     MarketTypes.DealProposal memory ret;
     ret.piece_cid = CommonTypes.Cid(deal.piece_cid);
+    console.log('ret.piece_cid');
+    console.logBytes(ret.piece_cid.data);
+    console.log('=============');
     ret.piece_size = deal.piece_size;
     ret.verified_deal = deal.verified_deal;
     ret.client = FilAddresses.fromEthAddress(address(this));
